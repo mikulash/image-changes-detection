@@ -15,6 +15,7 @@ def getColorAndPosition(event, x, y, flags, param):
 """main program"""
 # read stream
 cap = cv2.VideoCapture('./edited/2.mp4')
+# cap = cv2.VideoCapture('./edited/Jur_OK_1.mp4')
 
 if not cap.isOpened():
     print("cannot read video input")
@@ -30,15 +31,20 @@ print("frame_height", frame_height)
 cv2.namedWindow('getColor')
 cv2.setMouseCallback("getColor", getColorAndPosition)
 
-ret, frame = cap.read()
 detectedColor = None
 
-frame = cv2.resize(frame, (400, 300))
 # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV) zbytecny, protoze to stejne vraci BGR color, ale zobrazi to HSV
-cv2.imshow("getColor", frame)
-if cv2.waitKey(0) == 27:
-    # TODO zavirat okno po vybrani barvy
-    pass
+while True:
+    # sejmi barvu objektu, ale loop dokud se objekt neobjevi
+    ret, frame = cap.read()
+    frame = cv2.resize(frame, (400, 300))
+    cv2.imshow("getColor", frame)
+    key = cv2.waitKey(0)
+    if key == 39 or key == 32:  # dalsi frame pri kliku -> nebo space
+        continue
+    if key == 27:
+        # TODO zavirat okno po vybrani barvy
+        break
 
 print("detectedCOlor", detectedColor)
 detectedColor = np.uint8([[detectedColor]])
