@@ -3,6 +3,16 @@ import numpy as np
 
 
 # functions
+
+def otevrit(image):
+    kernel = np.ones((3, 3), np.uint8)
+    kernel2 = np.ones((4, 4), np.uint8)
+    kernel3 = np.ones((2, 2), np.uint8)
+    eroded = cv2.erode(image, kernel)
+    diluted = cv2.dilate(eroded, kernel2, iterations=1)
+    eroded = cv2.erode(diluted, kernel3)
+    return eroded
+
 def alterImage(frame, height=500, width=400):
     frame = cv2.resize(frame, (height, width))
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -19,42 +29,44 @@ def getColorAndPositionFromUserCallback(event, x, y, flags, param):
         position = (x, y)
 
 
-def getMaskFromContours(grayImage, position):
+def getMaskFromContours(grayImage, position, clrd):
+    clrd = clrd.copy()
     obr = grayImage.copy()
-    sharpeningKernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
+    sharpeningKernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
     sharp = cv2.filter2D(obr, -1, sharpeningKernel)
-    kernel = np.ones((3, 3), np.uint8)
-    blur = cv2.blur(obr, (5,5))
-    blur1 = cv2.bilateralFilter(obr, 9,75,75)
-    edges1 = cv2.Canny(blur, 60, 180)
-    # diluted = cv2.dilate(edges, kernel, iterations=1)
+    kernel = np.ones((2,2), np.uint8)
+    bluredSharp = cv2.bilateralFilter(sharp, 9, 75, 75)
+    edgesSharp = cv2.Canny(bluredSharp, 120, 255, 1)
+    # eroze a pak diletace = otevreni, oddeleni od sebe blizkych objektu
+    # eroded = cv2.erode(edgesSharp, kernel)
+    diluted = cv2.dilate(edgesSharp, kernel, iterations=1)
+    cv2.imshow("edges", diluted)
     # ret, thresh = cv2.threshold(gray, 127, 255, 0)
-    th3 = cv2.adaptiveThreshold(
-        blur1, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 2)
-    cv2.imshow("thresh", th3)
-    cv2.imshow("sharp", sharp)
-    cv2.imshow("blurrr", blur1)
-    cv2.imshow("edges", edges1)
     # contours, hierarchy = cv2.findContours(blur1, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    # cv2.imshow("debug2", contours)
-    # eroded = cv2.erode(th3, kernel, iterations=2)
-    dilated = cv2.dilate(edges1, kernel, iterations=1)
-    cv2.imshow("eroded", dilated)
-    contours, hierarchy = cv2.findContours(
-        edges1, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    # cv2.imshow("contours", contours)
-    # contours, hierarchy = cv2.findContours(blur1, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    for cnt in contours:
-        result = cv2.pointPolygonTest(cnt, position, True)
-        print(result)
-        if result > 0:
-            print("nasel polygon", result)
-            template = np.zeros(grayImage.shape)
-            cv2.drawContours(
-                template, [cnt], contourIdx=-1, color=(255, 255, 255), thickness=-1)
-            return np.uint8(template)
+    # contours, hierarchy = cv2.findContours(
+    #     diluted, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours(diluted, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    # cv2.drawContours(clrd, contours, -1, (0, 255, 255), 3)
+    # cv2.imshow("contoured", clrd)
+    template = np.zeros(grayImage.shape)
+    clrd = cv2.circle(clrd, position, radius=3, color=(255, 0, 255), thickness=-1)
+    if contours is not None:
+        for cnt in contours:
+            result = cv2.pointPolygonTest(cnt, position, True)
+            # print(result)
+            if result > 0:
+                # debug
+                cv2.drawContours(clrd, [cnt], 0, color=(0, 255, 0), thickness=1)
+                # output
+                cv2.drawContours(
+                    template, [cnt], -1, color=(255, 255, 255), thickness=-1)
+            else:
+                cv2.drawContours(clrd, [cnt], contourIdx=-1, color=(0,0, 125), thickness=-1)
     # in case of error of stream
-    return np.ones(grayImage.shape, np.uint8)
+    cv2.imshow("CONTOURSSS", clrd)
+    # TODO prekryvani contours hran ruznych hran je potreba jeste optimalizovat, mozna odecist prvni image? to by mohlo odstranit hranu podlozky
+    cv2.imshow("teamplate", template)
+    return np.uint8(template)
 
 
 """main program"""
@@ -63,7 +75,7 @@ def getMaskFromContours(grayImage, position):
 # img = cv2.imread('./imgs/'+images[1])
 # mask = getMaskFromContours(img, (430, 445))
 videos = ['./edited/2.mp4', './edited/Jur_OK_1.mp4', './edited/kostka2.mp4']
-cap = cv2.VideoCapture(videos[2])
+cap = cv2.VideoCapture(videos[1])
 
 if not cap.isOpened():
     print("cannot read video input")
@@ -125,9 +137,8 @@ while True:
     cFrame, hsv, gray = alterImage(cFrame)
     hueMask = cv2.inRange(hsv, lowColor, upperColor)
     masked = cv2.bitwise_and(cFrame, cFrame, mask=hueMask)
-    contourMask = getMaskFromContours(gray, position)
+    contourMask = getMaskFromContours(gray, position, cFrame)
     masked2 = cv2.bitwise_and(cFrame, cFrame, mask=contourMask)
-    cv2.imshow("MASK2", contourMask)
     cv2.imshow("MASKED2", masked2)
     """Detect errors here!!!"""
     # cv2.imshow("quantized", quantizationOfIMG(cFrame, 2, 10))
@@ -154,7 +165,7 @@ while True:
     cv2.drawContours(cFrame, contours, -1, (0, 0, 255), 2)
     # cv2.imshow("masked", masked)
     cv2.imshow("frame", cFrame)
-    cv2.waitKey(40)
+    cv2.waitKey(50)
     pFrame = cFrame
 
 cv2.destroyAllWindows()
