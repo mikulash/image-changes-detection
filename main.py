@@ -11,11 +11,14 @@ import tensorflow_hub as hub
 
 
 def avgError(threshold, imageChanges):
-    chyba = False
+    chyba = 0
     if len(imageChanges) > 5:
         if mean(imageChanges) > threshold:
-            chyba = True
+            chyba = 1
             print(mean(imageChanges))
+        elif mean(imageChanges) < 50:
+            print(mean(imageChanges))
+            chyba = -1
         imageChanges.pop(0)
     print(imageChanges, chyba)
     return chyba
@@ -95,7 +98,9 @@ def getMaskFromContours(grayImage, position, clrd):
 # images = ['nohy.png', 'kostka.png']
 # img = cv2.imread('./imgs/'+images[1])
 # mask = getMaskFromContours(img, (430, 445))
-videos = ['./edited/1.mp4', './edited/Jur_OK_1.mp4', './edited/kostka2.mp4']
+videos = ['./edited/18.mp4', './edited/Jur_OK_1.mp4', './edited/kostka2.mp4']
+tolerance_horni = 1000
+tolerance_dolni = 50
 cap = cv2.VideoCapture(videos[0])
 
 # model = keras.models.load_model('./models/myModels/transferModelV2', custom_objects={'KerasLayer': hub.KerasLayer})
@@ -147,8 +152,7 @@ print("upperColor", upperColor)
 ret, frame = cap.read()
 frame = cv2.bilateralFilter(frame, 15, 75, 75)  # snizit d=velikost filtru, pokud nebude stihat
 frame, hsv, _ = alterImage(frame, finalWidth)
-
-hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+cv2.imshow("hsv", hsv)
 mask = cv2.inRange(hsv, lowColor, upperColor)
 prevMasked = cv2.bitwise_and(frame, frame, mask=mask)
 """MAIN LOOP"""
@@ -179,15 +183,17 @@ while True:
         sumContours += cv2.contourArea(contour)
         if cv2.contourArea(contour) < 900:
             continue
-    tolerance = 1000
     print(sumContours)
     imageChanges.append(sumContours)
-    chybaPretrvava = avgError(tolerance, imageChanges)
-    if sumContours > tolerance and chybaPretrvava:
+    chyba = avgError(tolerance_horni, imageChanges)
+    if sumContours > tolerance_horni and chyba == 1:
         cv2.putText(cFrame, "Status: Error", (10, 50), cv2.FONT_HERSHEY_SIMPLEX,
                     1, (0, 0, 255), 3)
         cv2.drawContours(kopie, contours, -1, (0, 0, 255), 2)
-    # TODO function for averaging contours past frames
+    if sumContours < tolerance_dolni and chyba == -1:
+        cv2.putText(cFrame, "Status: Run out of filament", (10, 50), cv2.FONT_HERSHEY_SIMPLEX,
+                    1, (0, 0, 255), 3)
+
     kopie = cFrame.copy()
 
     cv2.imshow("masked", masked)
@@ -196,83 +202,5 @@ while True:
     pFrame = cFrame
     prevMasked = masked
 
-# new one
-# ret, frame = cap.read()
-# frame = cv2.bilateralFilter(frame, 15, 75, 75) #snizit d=velikost filtru, pokud nebude stihat
-# frame, hsv, _ = alterImage(frame, finalWidth)
-# mask = cv2.inRange(hsv, lowColor, upperColor)
-# prevMasked = cv2.bitwise_and(frame, frame, mask=mask)
-# pFrame = frame
-# while True:
-#     ret, cFrame = cap.read()
-#     if not ret:
-#         break
-#     cFrame = cv2.bilateralFilter(cFrame, 5, 75, 75)
-#     cFrame, hsv, gray = alterImage(cFrame, finalWidth)
-#     hueMask = cv2.inRange(hsv, lowColor, upperColor)
-#     masked = cv2.bitwise_and(cFrame, cFrame, mask=hueMask)
-#     cv2.imshow("masked", masked)
-#     diff = cv2.absdiff(prevMasked, masked)
-#     _,_, grayFromHUE = cv2.split(diff)
-#     tolerance = 1000
-#     sumContours = 0
-#     _, thresh = cv2.threshold(grayFromHUE, 20, 255, cv2.THRESH_BINARY)
-#     contours, _ = cv2.findContours(grayFromHUE, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-#     for contour in contours:
-#         sumContours += cv2.contourArea(contour)
-#     print(sumContours)
-#     if sumContours > tolerance:
-#         cv2.putText(cFrame, "Status: Error", (10, 50), cv2.FONT_HERSHEY_SIMPLEX,
-#                     1, (0, 0, 255), 3)
-#
-#     cv2.imshow("diffe2", diff)
-#     cv2.waitKey(50)
-#     pFrame = cFrame
-#     prevMasked = masked
-#
 cv2.destroyAllWindows()
 cap.release()
-
-# import cv2
-# import numpy as np
-# import os
-#
-# videos = ['./edited/1.mp4', './edited/Jur_OK_1.mp4', './edited/kostka2.mp4']
-# cap = cv2.VideoCapture(videos[0])
-#
-#
-# if not cap.isOpened():
-#     print("cannot read video input")
-#     exit()
-#
-# # video metadata
-# _, bgnd = cap.read()
-# backGround, _, grayBackground = alterImage(bgnd)
-# _, pFrame = cap.read()
-# cFrame, prev_hsv, prev_gray = alterImage(pFrame)
-# pBlur = cv2.GaussianBlur(prev_gray, (5, 5), 0)
-# diff = cv2.absdiff(pBlur, pBlur)
-# while True:
-#     ret, cFrame = cap.read()
-#     if not ret:
-#         break
-#     cFrame, _, gray = alterImage(cFrame)
-#     blur = cv2.GaussianBlur(gray, (5, 5), 0)
-#     diff = cv2.absdiff(blur, pBlur)
-#     _, thresh = cv2.threshold(diff, 15, 255, cv2.THRESH_BINARY)
-#     contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-#     sumContours = 0
-#     for contour in contours:
-#         cntArea = cv2.contourArea(contour)
-#         if cntArea > 300:
-#             print("chyba streamu")
-#         sumContours += cntArea
-#     print(sumContours)
-#     cv2.drawContours(cFrame, contours, -1, (0, 0, 255), 2)
-#     cv2.imshow("frame", cFrame)
-#     cv2.imshow("dil", thresh)
-#     cv2.waitKey(50)
-#     pFrame, prev_gray, pBlur = cFrame, gray, blur
-#
-# cv2.destroyAllWindows()
-# cap.release()
