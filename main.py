@@ -156,10 +156,14 @@ while True:
     """Detect errors here!!!"""
     # rozdil dvou poslednich snimku
     diff = cv2.absdiff(prevMasked, masked)
+    # ponechat jenom Value z Hue-Saturation-Valie
     h, s, grayFromHUE = cv2.split(diff)
+    # eliminovat male zmeny napr. z duvodu pohybu kamery
     blur = cv2.GaussianBlur(grayFromHUE, (5, 5), 0)
     _, thresh = cv2.threshold(blur, 20, 255, cv2.THRESH_BINARY)
+    # zvyraznit vetsi zmeny
     dilated = cv2.dilate(thresh, None, iterations=3)
+    # spocitat velikost zmen
     contours, _ = cv2.findContours(
         dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     sumContours = 0
@@ -168,6 +172,7 @@ while True:
         if cv2.contourArea(contour) < 900:
             continue
     print(sumContours)
+    # zjistit zmeny na poslednich nekolika snimcich
     imageChanges.append(sumContours)
     chyba = avgError(tolerance_horni, imageChanges)
     if sumContours > tolerance_horni and chyba == 1:
