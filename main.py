@@ -1,3 +1,5 @@
+# Author: Mikulas Heinz, xheinz, 2022, License: AGPLv3
+
 import cv2
 import numpy as np
 import os
